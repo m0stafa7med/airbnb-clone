@@ -1,0 +1,3 @@
+[submodule "airbnb-frontend"]
+	path = airbnb-frontend
+	url = git@github.com:m0stafa7med/airbnb-frontend.git
