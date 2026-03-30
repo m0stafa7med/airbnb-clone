@@ -37,9 +37,10 @@ services:
       - traefik-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.airbnb-backend.rule=Host(`airbnb.mostafadarwesh.com`) && PathPrefix(`/api`, `/oauth2`, `/login`)"
+      - "traefik.http.routers.airbnb-backend.rule=Host(`airbnb.mostafadarwesh.com`) && (PathPrefix(`/api`) || PathPrefix(`/oauth2`) || PathPrefix(`/login`))"
       - "traefik.http.routers.airbnb-backend.entrypoints=websecure"
       - "traefik.http.routers.airbnb-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.airbnb-backend.priority=10"
       - "traefik.http.services.airbnb-backend.loadbalancer.server.port=8081"
 
   frontend:
