@@ -33,7 +33,7 @@ services:
       AUTH0_ROLE_LANDLORD_ID: ${AUTH0_ROLE_LANDLORD_ID}
     networks:
       - app-network
-      - traefik-public
+      - traefik-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.airbnb-backend.rule=Host(`airbnb.mostafadarwesh.com`) && PathPrefix(`/api`, `/oauth2`, `/login`)"
@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-      - traefik-public
+      - traefik-net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.airbnb-frontend.rule=Host(`airbnb.mostafadarwesh.com`)"
@@ -60,5 +60,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
-  traefik-public:
+  traefik-net:
     external: true
