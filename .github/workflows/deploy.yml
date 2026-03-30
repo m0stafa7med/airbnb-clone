@@ -133,7 +133,11 @@ jobs:
             # Pull latest images
             docker compose -f docker-compose.prod.yml pull backend frontend
 
-            # Restart only changed services (zero-downtime for DB)
+            # Ensure postgres is up and healthy first
+            docker compose -f docker-compose.prod.yml up -d postgres
+            docker compose -f docker-compose.prod.yml wait postgres
+
+            # Restart app services with the new images
             docker compose -f docker-compose.prod.yml up -d --no-deps backend frontend
 
             # Clean up old images
