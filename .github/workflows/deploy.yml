@@ -123,6 +123,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 5m
           script: |
             set -e
             cd /opt/airbnb
@@ -133,9 +134,15 @@ jobs:
             # Pull latest images
             docker compose -f docker-compose.prod.yml pull backend frontend
 
-            # Ensure postgres is up and healthy first
+            # Ensure postgres is up
             docker compose -f docker-compose.prod.yml up -d postgres
-            docker compose -f docker-compose.prod.yml wait postgres
+
+            # Wait until postgres is healthy (not 'wait' which blocks until exit)
+            echo "Waiting for postgres to be healthy..."
+            until [ "$(docker inspect --format='{{.State.Health.Status}}' airbnb-postgres-1)" = "healthy" ]; do
+              sleep 2
+            done
+            echo "Postgres is healthy."
 
             # Restart app services with the new images
             docker compose -f docker-compose.prod.yml up -d --no-deps backend frontend
