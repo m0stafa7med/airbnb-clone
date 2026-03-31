@@ -1,151 +1,30 @@
-name: Build & Deploy
+name: Deploy Airbnb Clone
 
 on:
   push:
     branches: [master]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/airbnb-backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/airbnb-frontend
-
 jobs:
-  # ─── Job 1: Build & push backend image ────────────────────────────────────
-  build-backend:
-    name: Build Backend
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for backend
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.BACKEND_IMAGE }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push backend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./airbnb-backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
-
-  # ─── Job 2: Build & push frontend image ───────────────────────────────────
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for frontend
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.FRONTEND_IMAGE }}
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./airbnb-frontend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
-
-  # ─── Job 3: Deploy to VPS ─────────────────────────────────────────────────
   deploy:
-    name: Deploy to VPS
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend]
-    environment: production
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Copy docker-compose.prod.yml to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml"
-          target: "/opt/airbnb"
-
-      - name: Deploy via SSH
+      - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 5m
+          command_timeout: 10m
           script: |
-            set -e
             cd /opt/airbnb
 
-            # Log in to ghcr.io
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            # Pull latest changes with submodules
+            git pull origin master --recurse-submodules
+            git submodule update --remote --merge
 
-            # Pull latest images
-            docker compose -f docker-compose.prod.yml pull backend frontend
-
-            # Ensure postgres is up
-            docker compose -f docker-compose.prod.yml up -d postgres
-
-            # Wait until postgres is healthy (not 'wait' which blocks until exit)
-            echo "Waiting for postgres to be healthy..."
-            until [ "$(docker inspect --format='{{.State.Health.Status}}' airbnb-postgres-1)" = "healthy" ]; do
-              sleep 2
-            done
-            echo "Postgres is healthy."
-
-            # Restart app services with the new images
-            docker compose -f docker-compose.prod.yml up -d --no-deps backend frontend
+            # Rebuild and restart containers
+            docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
             # Clean up old images
             docker image prune -f

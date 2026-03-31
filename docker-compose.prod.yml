@@ -18,7 +18,7 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/m0stafa7med/airbnb-backend:latest
+    build: ./airbnb-backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -45,7 +45,7 @@ services:
       - "traefik.http.services.airbnb-backend.loadbalancer.server.port=8081"
 
   frontend:
-    image: ghcr.io/m0stafa7med/airbnb-frontend:latest
+    build: ./airbnb-frontend
     restart: unless-stopped
     networks:
       - app-network
