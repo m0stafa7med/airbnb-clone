@@ -17,7 +17,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           command_timeout: 10m
           script: |
-            cd /opt/airbnb
+            cd ~/projects/airbnb-clone
 
             # Pull latest changes with submodules
             git pull origin master --recurse-submodules
